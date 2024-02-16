@@ -1,5 +1,7 @@
+import socket
+import threading
+
 from common.file_utils import read_file_lines
-from common.cryptography_utils import *
 
 
 class AuthServer:
@@ -10,6 +12,34 @@ class AuthServer:
             print("port must be a number between 1024 and 65535. Using default port 1256!")
             port = 1256
         self.port = int(port)
+        self.host = '127.0.0.1'
+
+    def handle_client(self, client_socket, client_address):
+        """
+        Gets the socket object and client address and handles the request
+        :param client_socket:
+        :param client_address:
+        :return:
+        """
+        print(f"Connection from {client_address}")
+
+        # Receiving data in chunks
+        received_data = b''
+        while True:
+            chunk = client_socket.recv(1024)
+            received_data += chunk
+            if len(chunk) < 1024:
+                break
+
+        decoded_data = received_data.decode('utf-8')
+        print(f"Received data from {client_address}: {decoded_data}")
+
+        # Send a response back to the client
+        response = "Hello, client! I received your message."
+        client_socket.send(response.encode('utf-8'))
+
+        print(f"Connection with {client_address} closed.")
+        client_socket.close()
 
     def start_server(self):
         """
@@ -20,11 +50,14 @@ class AuthServer:
         print(f'auth server started on port {self.port}!')
         self.clients = read_file_lines('clients')
 
-        key = 'abcdabcdabcdabcd'.encode()
-        text = 'my encrypted text'.encode()
+        # Create a socket server
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.bind((self.host, self.port))
+        server_socket.listen()
 
-        encrypted, iv = encrypt_aes_cbc(key, text, None)
-        decrypted = decrypt_aes_cbc(key, encrypted, iv)
-        print(f'decrypted: {decrypted}!')
+        print(f"Server listening on {self.host}:{self.port}")
 
-
+        while True:
+            client_socket, client_address = server_socket.accept()
+            client_handler = threading.Thread(target=self.handle_client, args=(client_socket, client_address))
+            client_handler.start()
