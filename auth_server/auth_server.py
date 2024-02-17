@@ -1,6 +1,8 @@
 import socket
 import threading
 
+from auth_server import protocol_handler
+from auth_server.protocol_handler import ProtocolHandler
 from common.file_utils import read_file_lines
 
 
@@ -13,6 +15,7 @@ class AuthServer:
             port = 1256
         self.port = int(port)
         self.host = '127.0.0.1'
+        self.protocol_handler = ProtocolHandler()
 
     def handle_client(self, client_socket, client_address):
         """
@@ -31,12 +34,12 @@ class AuthServer:
             if len(chunk) < 1024:
                 break
 
-        decoded_data = received_data.decode('utf-8')
-        print(f"Received data from {client_address}: {decoded_data}")
+        print(f"Received data from {client_address}: {received_data}")
 
+        response = self.protocol_handler.process(received_data)
         # Send a response back to the client
-        response = "Hello, client! I received your message."
-        client_socket.send(response.encode('utf-8'))
+        responseString = f"Hello, {response.name}! I received your password: {response.password}."
+        client_socket.send(responseString.encode('utf-8'))
 
         print(f"Connection with {client_address} closed.")
         client_socket.close()

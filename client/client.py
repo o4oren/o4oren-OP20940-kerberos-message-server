@@ -1,5 +1,8 @@
 import socket
 
+from common.protocol.server_request import ServerRequest
+from common.protocol.user_registration_request_1024 import UserRegistrationRequest
+
 
 class Client:
 
@@ -17,7 +20,9 @@ class Client:
         client_socket.connect((server_address, server_port))
 
         try:
-            client_socket.send(message.encode('utf-8'))
+            payload = UserRegistrationRequest("aUser\0", "abcd1234\0")
+            request = ServerRequest(bytearray(16), 24, 1024, payload)
+            client_socket.send(request.pack())
             print("message sent!")
             # Receive and print the response
             response = client_socket.recv(1024).decode('utf-8')
