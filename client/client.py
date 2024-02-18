@@ -33,11 +33,3 @@ class Client:
             print("Closing the connection from client side")
             client_socket.close()
 
-
-def main():
-    client = Client()
-    client.start_client()
-
-
-if __name__ == "__main__":
-    main()

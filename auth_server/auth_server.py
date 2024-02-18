@@ -15,14 +15,22 @@ CLIENT_REGISTRATION_CODE = 1024
 
 
 class AuthServer:
-    def __init__(self, port):
-        self.clients = dict()
+    def __init__(self, server_port_file):
+        """
+        Initializes an auth server.
+        :param server_port_file: The address of a file with the port to listen on.
+        """
+        lines = read_file_lines(server_port_file)
+        port = lines[0]
         if is_valid_port(port):
             print("port must be a number between 1024 and 65535. Using default port 1256!")
         else:
             port = 1256
         self.port = int(port)
         self.host = '127.0.0.1'
+        self.clients = dict()
+
+        self.start_server()
 
     def handle_client_request(self, client_socket, client_address):
         """
@@ -116,11 +124,3 @@ class AuthServer:
 # TODO return response object
 
 
-def main():
-    lines = read_file_lines("port.info")
-    server = AuthServer(lines[0])
-    server.start_server()
-
-
-if __name__ == "__main__":
-    main()
