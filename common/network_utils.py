@@ -4,7 +4,7 @@ import ipaddress
 def is_valid_port(port_str: str) -> bool:
     try:
         port = int(port_str)
-        return 0 <= port <= 65535
+        return 0 <= int(port) <= 65535
     except ValueError:
         return False
 

@@ -36,7 +36,7 @@ def main():
     3rd line - auth_server_ip:auth_server_port
     :return:
     """
-    lines = read_file_lines("./msg_server.info")
+    lines = read_file_lines("../msg_server.info")
     my_ip = lines[0].split(':')[0]
     my_port = lines[0].split(':')[1]
     my_name = lines[1]

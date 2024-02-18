@@ -1,4 +1,5 @@
 from Crypto.Cipher import AES
+from Crypto.Hash import SHA256
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
 import base64
@@ -38,6 +39,18 @@ def decrypt_aes_cbc(key, encrypted_text, iv):
     except (ValueError, KeyError):
         print("Incorrect decryption")
     return None
+
+
+def sha256_hash(input_bytes: bytes):
+    # Create a new SHA-256 hash object
+    sha256_hash_object = SHA256.new()
+
+    # Update the hash object with the bytes representation of the input string
+    sha256_hash_object.update(input_bytes)
+
+    hashed_bytes = sha256_hash_object.digest()
+
+    return hashed_bytes
 
 
 def generate_aes_key():

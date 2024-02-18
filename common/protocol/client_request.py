@@ -1,6 +1,7 @@
 import struct
 
-class ServerRequest:
+
+class ClientRequest:
     def __init__(self, client_id, version, code, payload):
         """
         This class represents a server request. It encapsulates the header struct, and assumes the payload

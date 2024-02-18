@@ -1,6 +1,6 @@
 import socket
 
-from common.protocol.server_request import ServerRequest
+from common.protocol.client_request import ClientRequest
 from common.protocol.user_registration_request_1024 import UserRegistrationRequest
 
 
@@ -20,8 +20,8 @@ class Client:
         client_socket.connect((server_address, server_port))
 
         try:
-            payload = UserRegistrationRequest("aUser\0", "abcd1234\0")
-            request = ServerRequest(bytearray(16), 24, 1024, payload)
+            payload = UserRegistrationRequest("aUser3\0", "abcd12342\0")
+            request = ClientRequest(bytearray(16), 24, 1024, payload)
             client_socket.send(request.pack())
             print("message sent!")
             # Receive and print the response
