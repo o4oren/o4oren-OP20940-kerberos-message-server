@@ -1,8 +1,5 @@
 import struct
 
-from common.protocol.user_registration_request_1024 import UserRegistrationRequest
-
-
 class ServerRequest:
     def __init__(self, client_id, version, code, payload):
         """

@@ -1,8 +1,8 @@
 import socket
 import threading
 
-from auth_server import protocol_handler
-from auth_server.protocol_handler import ProtocolHandler
+from common.network_utils import is_valid_port
+from protocol_handler import ProtocolHandler
 from common.file_utils import read_file_lines
 
 
@@ -10,7 +10,7 @@ class AuthServer:
 
     def __init__(self, port):
         self.clients = []
-        if not port.isnumeric() or not 1024 <= int(port) <= 65535:
+        if is_valid_port(port):
             print("port must be a number between 1024 and 65535. Using default port 1256!")
             port = 1256
         self.port = int(port)
@@ -38,8 +38,8 @@ class AuthServer:
 
         response = self.protocol_handler.process(received_data)
         # Send a response back to the client
-        responseString = f"Hello, {response.name}! I received your password: {response.password}."
-        client_socket.send(responseString.encode('utf-8'))
+        response_string = f"Hello, {response.name}! I received your password: {response.password}."
+        client_socket.send(response_string.encode('utf-8'))
 
         print(f"Connection with {client_address} closed.")
         client_socket.close()
@@ -64,3 +64,13 @@ class AuthServer:
             client_socket, client_address = server_socket.accept()
             client_handler = threading.Thread(target=self.handle_client, args=(client_socket, client_address))
             client_handler.start()
+
+
+def main():
+    lines = read_file_lines("./port.info")
+    server = AuthServer(lines[0])
+    server.start_server()
+
+
+if __name__ == "__main__":
+    main()
