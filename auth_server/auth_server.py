@@ -17,6 +17,8 @@ VERSION = 24
 CLIENT_REGISTRATION_CODE = 1024
 
 CLIENT_REGISTRATION_SUCCESS_CODE = 1600
+CLIENT_REGISTRATION_FAIL_CODE = 1601
+
 
 class AuthServer:
     def __init__(self, server_port_file):
@@ -103,21 +105,24 @@ class AuthServer:
         return struct.unpack('<h', bytes_18_19)[0]
 
     def process_user_registration(self, request):
-        client_request = ClientRequest.unpack(request, payload_type=UserRegistrationRequest)
-        payload = client_request.payload
+        try:
+            client_request = ClientRequest.unpack(request, payload_type=UserRegistrationRequest)
+            client_payload = client_request.payload
 
-        for client_val in self.clients.values():
-            if client_val.name == payload.name:
-                raise RuntimeError("User already exists!")
+            for client_val in self.clients.values():
+                if client_val.name == client_payload.name:
+                    raise RuntimeError("User already exists!")
 
-        client_id = uuid.uuid4()
-        password_hash = sha256_hash(payload.password.encode('utf-8'))
+            client_id = uuid.uuid4()
+            password_hash = sha256_hash(client_payload.password.encode('utf-8'))
 
-        client = Client(client_id.bytes, payload.name, password_hash)
-        self.add_client(client)
+            client = Client(client_id.bytes, client_payload.name, password_hash)
+            self.add_client(client)
 
-        user_registration_payload = UserRegistrationSuccessResponse(client_id.bytes)
-        response = ServerResponse(VERSION, CLIENT_REGISTRATION_CODE, user_registration_payload)
+            user_registration_payload = UserRegistrationSuccessResponse(client_id.bytes)
+            response = ServerResponse(VERSION, CLIENT_REGISTRATION_SUCCESS_CODE, user_registration_payload)
+        except RuntimeError as e:
+            response = ServerResponse(VERSION, CLIENT_REGISTRATION_FAIL_CODE, None)
 
         return response.pack()
 
@@ -126,7 +131,4 @@ class AuthServer:
         client_line = f"{client.client_id.hex()}:{client.name}:{client.password_hash.hex()}:{get_timestamp_string(client.last_seen)}"
         write_to_file("clients", client_line)
 
-
 # TODO return response object
-
-

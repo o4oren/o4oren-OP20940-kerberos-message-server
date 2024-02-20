@@ -21,9 +21,13 @@ class ServerResponse:
         self.payload = payload
 
     def pack(self):
-        payload_data = self.payload.pack()
-        format_string = '<BHI' + str(len(payload_data)) + 's'
-        self.payload_size = len(payload_data)
+        if self.payload is not None:
+            payload_data = self.payload.pack()
+            self.payload_size = len(payload_data)
+        else:
+            payload_data = bytes(0)
+
+        format_string = '<BHI' + str(self.payload_size) + 's'
         return struct.pack(format_string, self.version, self.code, self.payload_size,
                            payload_data)
 
@@ -37,6 +41,9 @@ class ServerResponse:
         :return:
         """
         version, code, payload_size = struct.unpack('<BHI', packed_data[:7])
-        payload_data = packed_data[7:7 + payload_size]
-        payload = payload_type.unpack(payload_data)
+        if payload_size > 0:
+            payload_data = packed_data[7:7 + payload_size]
+            payload = payload_type.unpack(payload_data)
+        else:
+            payload = None
         return cls(version, code, payload)
