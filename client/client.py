@@ -1,7 +1,9 @@
 import socket
 
 from common.protocol.client_request import ClientRequest
-from common.protocol.user_registration_request_1024 import UserRegistrationRequest
+from common.protocol.request_1024_user_registration import UserRegistrationRequest
+from common.protocol.response_1600_user_registration_success import UserRegistrationSuccessResponse
+from common.protocol.server_response import ServerResponse
 
 
 class Client:
@@ -20,13 +22,15 @@ class Client:
         client_socket.connect((server_address, server_port))
 
         try:
-            payload = UserRegistrationRequest("aUser3\0", "abcd12342\0")
+            payload = UserRegistrationRequest("aUser15\0", "abcd12342\0")
             request = ClientRequest(bytearray(16), 24, 1024, payload)
             client_socket.send(request.pack())
             print("message sent!")
             # Receive and print the response
-            response = client_socket.recv(1024).decode('utf-8')
-            print("Server response:", response)
+            response_bytes = client_socket.recv(1024)
+            # TODO check response code
+            response = ServerResponse.unpack(response_bytes, UserRegistrationSuccessResponse)
+            print(f"User created - ID: {response.payload.client_id.hex()}")
 
         finally:
             # Close the socket

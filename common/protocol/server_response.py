@@ -1,7 +1,7 @@
 import struct
 
 
-class ClientRequest:
+class ServerResponse:
     def __init__(self, version, code, payload):
         """
         This class represents a server response. It encapsulates the header struct, and assumes the payload
@@ -36,7 +36,7 @@ class ClientRequest:
         :param payload_type:
         :return:
         """
-        version, code, payload_size = struct.unpack('<16sBHI', packed_data[:7])
+        version, code, payload_size = struct.unpack('<BHI', packed_data[:7])
         payload_data = packed_data[7:7 + payload_size]
         payload = payload_type.unpack(payload_data)
         return cls(version, code, payload)

@@ -8,11 +8,15 @@ from common.date_utils import get_date_string, get_timestamp_string
 from common.network_utils import is_valid_port
 from common.file_utils import read_file_lines, write_to_file
 from common.protocol.client_request import ClientRequest
-from common.protocol.user_registration_request_1024 import UserRegistrationRequest
+from common.protocol.request_1024_user_registration import UserRegistrationRequest
+from common.protocol.response_1600_user_registration_success import UserRegistrationSuccessResponse
+from common.protocol.server_response import ServerResponse
 from .as_client import Client
 
+VERSION = 24
 CLIENT_REGISTRATION_CODE = 1024
 
+CLIENT_REGISTRATION_SUCCESS_CODE = 1600
 
 class AuthServer:
     def __init__(self, server_port_file):
@@ -54,8 +58,7 @@ class AuthServer:
         try:
             response = self.process_request(received_data)
             # Send a response back to the client
-            response_string = f"Hello, {response.name}! I received your password: {response.password}."
-            client_socket.send(response_string.encode('utf-8'))
+            client_socket.send(response)
 
         except Exception as e:
             print(f"error an with responded server {e}")
@@ -113,7 +116,10 @@ class AuthServer:
         client = Client(client_id.bytes, payload.name, password_hash)
         self.add_client(client)
 
-        return payload
+        user_registration_payload = UserRegistrationSuccessResponse(client_id.bytes)
+        response = ServerResponse(VERSION, CLIENT_REGISTRATION_CODE, user_registration_payload)
+
+        return response.pack()
 
     def add_client(self, client: Client):
         self.clients[client.get_id_string()] = client
