@@ -6,5 +6,6 @@ from common.file_utils import read_file_lines
 def main():
     server = AuthServer("port.info")
 
+
 if __name__ == "__main__":
     main()

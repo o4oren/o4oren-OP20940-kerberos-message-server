@@ -2,18 +2,16 @@ import struct
 
 
 class ClientRequest:
-    def __init__(self, client_id, version, code, payload):
+    def __init__(self, version, code, payload):
         """
-        This class represents a client request. It encapsulates the header struct, and assumes the payload
+        This class represents a server response. It encapsulates the header struct, and assumes the payload
         has a pack/unpack methods, that packs it into a struct to be sent as binary data.
         The class exposes an instance pack method that returns the packed binary bytes to be sent.
         The class exposes a class method to create the object from passed binary bytes
-        :param client_id: the client's id
-        :param version: the client's version
-        :param code: request code (the server knows how to parse it accordingly)
+        :param version: the serber's version
+        :param code: response code (the server knows how to parse it accordingly)
         :param payload: packed binary payload
         """
-        self.client_id = client_id
         self.version = version
         self.code = code
 
@@ -24,9 +22,9 @@ class ClientRequest:
 
     def pack(self):
         payload_data = self.payload.pack()
-        format_string = '<16sBHI' + str(len(payload_data)) + 's'
+        format_string = '<BHI' + str(len(payload_data)) + 's'
         self.payload_size = len(payload_data)
-        return struct.pack(format_string, self.client_id, self.version, self.code, self.payload_size,
+        return struct.pack(format_string, self.version, self.code, self.payload_size,
                            payload_data)
 
     @classmethod
@@ -38,7 +36,7 @@ class ClientRequest:
         :param payload_type:
         :return:
         """
-        client_id, version, code, payload_size = struct.unpack('<16sBHI', packed_data[:23])
-        payload_data = packed_data[23:23 + payload_size]
-        payload = payload_type.unpack(payload_data)  # TODO make this dynamic
-        return cls(client_id, version, code, payload)
+        version, code, payload_size = struct.unpack('<16sBHI', packed_data[:7])
+        payload_data = packed_data[7:7 + payload_size]
+        payload = payload_type.unpack(payload_data)
+        return cls(version, code, payload)
