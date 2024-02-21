@@ -8,16 +8,14 @@ from common.date_utils import get_date_string, get_timestamp_string
 from common.network_utils import is_valid_port
 from common.file_utils import read_file_lines, write_to_file
 from common.protocol.client_request import ClientRequest
+from common.protocol.message_codes import CLIENT_REGISTRATION_CODE, CLIENT_REGISTRATION_SUCCESS_CODE, \
+    CLIENT_REGISTRATION_FAIL_CODE
 from common.protocol.request_1024_user_registration import UserRegistrationRequest
 from common.protocol.response_1600_user_registration_success import UserRegistrationSuccessResponse
 from common.protocol.server_response import ServerResponse
 from .as_client import Client
 
 VERSION = 24
-CLIENT_REGISTRATION_CODE = 1024
-
-CLIENT_REGISTRATION_SUCCESS_CODE = 1600
-CLIENT_REGISTRATION_FAIL_CODE = 1601
 
 
 class AuthServer:

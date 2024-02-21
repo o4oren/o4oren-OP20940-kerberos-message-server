@@ -11,10 +11,9 @@ class Client:
 
     def start_client(self):
         print("client started!")
-        self.send_message("Hello!")
-        print("message sent!")
+        self.register_client("user1", "password")
 
-    def send_message(self, message):
+    def register_client(self, name, password):
         server_address = '127.0.0.1'
         server_port = 1234
 
@@ -23,7 +22,7 @@ class Client:
         client_socket.connect((server_address, server_port))
 
         try:
-            payload = UserRegistrationRequest("aUser9\0", "abcd12342\0")
+            payload = UserRegistrationRequest(name, password)
             request = ClientRequest(bytearray(16), 24, 1024, payload)
             client_socket.send(request.pack())
             print("message sent!")
