@@ -6,7 +6,7 @@ import uuid
 from common.cryptography_utils import sha256_hash
 from common.date_utils import get_date_string, get_timestamp_string
 from common.network_utils import is_valid_port
-from common.file_utils import read_file_lines, write_to_file
+from common.file_utils import read_file_lines, write_line_to_file, write_lines_to_file
 from common.protocol.client_request import ClientRequest
 from common.protocol.message_codes import CLIENT_REGISTRATION_CODE, CLIENT_REGISTRATION_SUCCESS_CODE, \
     CLIENT_REGISTRATION_FAIL_CODE
@@ -127,6 +127,6 @@ class AuthServer:
     def add_client(self, client: Client):
         self.clients[client.get_id_string()] = client
         client_line = f"{client.client_id.hex()}:{client.name}:{client.password_hash.hex()}:{get_timestamp_string(client.last_seen)}"
-        write_to_file("clients", client_line)
+        write_line_to_file("clients", client_line)
 
 # TODO return response object
