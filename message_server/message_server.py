@@ -21,7 +21,7 @@ class MessageServer:
         2nd line - message server's name
         3rd line - auth_server_ip:auth_server_port
         4th line - the symmetrical key used to communicate with the auth server - if exists
-        5th line - the server ID assigned by the auth server
+        5th line - the server ID assigned by the auth server - if exists
         :param msg_server_config_file: path to config file
         """
         self.config_file = msg_server_config_file;
@@ -77,9 +77,9 @@ class MessageServer:
             response = ServerResponse.unpack(response_bytes, MessageServerRegistrationSuccessResponse)
             if response.code == SERVER_REGISTRATION_SUCCESS_CODE:
                 print(f"Server registered - ID: {response.payload.server_id.hex()}")
-                self.message_server_id = response.payload.server_id.hex()
+                self.message_server_id = response.payload.server_id
                 self.auth_server_key = auth_server_key
-                write_lines_to_file(self.msg_server_config_file, [self.auth_server_key.hex(), self.server_id.hex()])
+                write_lines_to_file(self.config_file, [self.auth_server_key.hex(), self.message_server_id.hex()])
             else:
                 print(f"Error {response.code} - User creation failed!")
 

@@ -5,37 +5,35 @@ from Crypto.Random import get_random_bytes
 import base64
 
 
-def encrypt_aes_cbc(key, plaintext, iv):
+def encrypt_aes_cbc(key, plain_bytes, iv):
     """
     Encrypts a text with the given key using AES-CBC
     :param key: The encryption key bytes
-    :param plaintext: The text string to encrypt
+    :param plain_bytes: The bytes to encrypt
     :param iv: an iv byte array to start the encryption with. In None, a random iv will be generated
-    :return: A tuple of the encrypted text and the iv encoded as base64 uft-8
+    :return: A tuple of the encrypted bytes and the iv bytes
     """
     # Generate a random IV (Initialization Vector)
     if iv is None:
         iv = get_random_bytes(AES.block_size)
     cipher = AES.new(key, AES.MODE_CBC, iv)
-    padded_data = pad(plaintext, AES.block_size)
+    padded_data = pad(plain_bytes, AES.block_size)
     ciphertext = cipher.encrypt(padded_data)
-    return base64.b64encode(ciphertext), base64.b64encode(iv)
+    return ciphertext, iv
 
 
-def decrypt_aes_cbc(key, encrypted_text, iv):
+def decrypt_aes_cbc(key, ciphertext, iv):
     """
     Decrypts an AES-CBC encoded text
     :param key: The key bytes
-    :param encrypted_text: Base64 encoded encrypted text
-    :param iv: Base64 encoded iv
-    :return: plain text bytes
+    :param ciphertext: encrypted bytes
+    :param iv: iv bytes
+    :return: decrypted bytes
     """
     try:
-        iv = base64.b64decode(iv)
-        ct = base64.b64decode(encrypted_text)
         cipher = AES.new(key, AES.MODE_CBC, iv)
-        plaintext = unpad(cipher.decrypt(ct), AES.block_size)
-        return plaintext
+        decrypted_bytes = unpad(cipher.decrypt(ciphertext), AES.block_size)
+        return decrypted_bytes
     except (ValueError, KeyError):
         print("Incorrect decryption")
     return None

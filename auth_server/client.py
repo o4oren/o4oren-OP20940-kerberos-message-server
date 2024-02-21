@@ -17,7 +17,7 @@ class Client:
         """
 
         if len(client_id) == 16:
-            self.id = client_id
+            self.client_id = client_id
         else:
             raise ValueError("Illegal client id")
 
@@ -34,9 +34,6 @@ class Client:
         if last_seen is None:
             last_seen = datetime.now()
         self.last_seen = last_seen
-        self.password_hash = password_hash
-        self.name = name
-        self.client_id = client_id
 
     def get_id_string(self):
         return self.client_id.hex()
