@@ -37,7 +37,7 @@ class MessageServer:
 
 
     def get_id_string(self):
-        return self.client_id.hex()
+        return self.server_id.hex()
 
     @classmethod
     def from_line(cls, line: str):
@@ -51,6 +51,5 @@ class MessageServer:
         parts = line.split(":")
         if len(parts) != 5:
             raise ValueError("Illegal message server string was found!")
-        server_id = uuid.UUID(parts[0]).bytes
 
-        return cls(server_id, parts[1], bytes.fromhex(parts[2]), parts[3], int(parts[4]))
+        return cls(bytes.fromhex(parts[0]), parts[1], bytes.fromhex(parts[2]), parts[3], int(parts[4]))

@@ -87,7 +87,6 @@ class AuthServer:
             for line in lines:
                 client = Client.from_line(line)
                 self.clients[client.get_id_string()] = client
-
             print(f'Loaded {len(lines)} clients from "clients" file')
 
         if is_file_exists(SERVERS):
@@ -95,6 +94,7 @@ class AuthServer:
             for line in lines:
                 server = MessageServer.from_line(line)
                 self.message_servers[server.get_id_string()] = server
+                print(f'Loaded {len(lines)} message servers from "servers" file')
 
         # Create a socket server
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -136,7 +136,7 @@ class AuthServer:
             password_hash = sha256_hash(client_payload.password.encode('utf-8'))
 
             client = Client(client_id.bytes, client_payload.name, password_hash)
-            self.add_client(client)
+            self.add_client_to_file(client)
 
             user_registration_payload = UserRegistrationSuccessResponse(client_id.bytes)
             response = ServerResponse(VERSION, CLIENT_REGISTRATION_SUCCESS_CODE, user_registration_payload)
@@ -145,9 +145,9 @@ class AuthServer:
 
         return response.pack()
 
-    def add_client(self, client: Client):
+    def add_client_to_file(self, client: Client):
         self.clients[client.get_id_string()] = client
-        client_line = f"{client.client_id.hex()}:{client.name}:{client.password_hash.hex()}:{get_timestamp_string(client.last_seen)}"
+        client_line = f'{client.client_id.hex()}:{client.name}:{client.password_hash.hex()}:{get_timestamp_string(client.last_seen)}'
         write_line_to_file(CLIENTS, client_line)
 
     def process_server_registration(self, request, client_ip, client_port):
@@ -164,9 +164,10 @@ class AuthServer:
             server_name = server_registration_payload.name
             server_key = server_registration_payload.message_server_key
             server_ip = client_ip
-            server_port = client_port
+            server_port = server_registration_payload.port
 
             message_server = MessageServer(server_id.bytes, server_name, server_key, server_ip, server_port)
+            self.add_message_server_to_file(message_server)
 
             message_server_registration_payload = MessageServerRegistrationSuccessResponse(message_server.server_id)
             response = ServerResponse(VERSION, SERVER_REGISTRATION_SUCCESS_CODE, message_server_registration_payload)
@@ -174,5 +175,8 @@ class AuthServer:
             response = ServerResponse(VERSION, GENERAL_SERVER_ERROR_CODE, None)
 
         return response.pack()
-
+    def add_message_server_to_file(self, server: MessageServer):
+        self.message_servers[server.get_id_string()] = server
+        server_line = f'{server.server_id.hex()}:{server.name}:{server.key.hex()}:{server.ip_address}:{server.port}'
+        write_line_to_file(SERVERS, server_line)
 # TODO return response object

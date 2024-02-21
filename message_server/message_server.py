@@ -24,7 +24,7 @@ class MessageServer:
         5th line - the server ID assigned by the auth server - if exists
         :param msg_server_config_file: path to config file
         """
-        self.config_file = msg_server_config_file;
+        self.config_file = msg_server_config_file
         lines = read_file_lines(msg_server_config_file)
         my_ip = lines[0].split(':')[0]
         my_port = lines[0].split(':')[1]
@@ -67,7 +67,7 @@ class MessageServer:
 
         try:
             auth_server_key = generate_aes_key()
-            payload = ServerRegistrationRequest(self.my_name, auth_server_key)
+            payload = ServerRegistrationRequest(self.my_name, auth_server_key, self.my_port)
             request = ClientRequest(bytes(16), self.VERSION, SERVER_REGISTRATION_CODE, payload)
             client_socket.send(request.pack())
             print("Server registration request sent!")
