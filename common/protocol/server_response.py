@@ -21,11 +21,14 @@ class ServerResponse:
         self.payload = payload
 
     def pack(self):
-        if self.payload is not None:
-            payload_data = self.payload.pack()
-            self.payload_size = len(payload_data)
-        else:
+        if self.payload is None:
             payload_data = bytes(0)
+        elif isinstance(self.payload, bytes):
+            payload_data = self.payload
+        else:
+            payload_data = self.payload.pack()
+
+        self.payload_size = len(payload_data)
 
         format_string = '<BHI' + str(self.payload_size) + 's'
         return struct.pack(format_string, self.version, self.code, self.payload_size,
@@ -36,14 +39,17 @@ class ServerResponse:
         """
         This method gets the packed data and payload type, and unpacks it into an object based on the passed
         payload type
-        :param packed_data:
-        :param payload_type:
+        :param packed_data: raw source bytes of the response
+        :param payload_type: bytes - for raw data. Any other type that has an unpack method to create a data class
         :return:
         """
         version, code, payload_size = struct.unpack('<BHI', packed_data[:7])
         if payload_size > 0:
             payload_data = packed_data[7:7 + payload_size]
-            payload = payload_type.unpack(payload_data)
+            if payload_type is bytes:  # treat payload as raw bytes
+                payload = payload_data
+            else:
+                payload = payload_type.unpack(payload_data)
         else:
             payload = None
         return cls(version, code, payload)

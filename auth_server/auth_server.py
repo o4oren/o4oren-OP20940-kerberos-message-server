@@ -9,7 +9,8 @@ from common.network_utils import is_valid_port
 from common.file_utils import read_file_lines, write_line_to_file, write_lines_to_file, is_file_exists
 from common.protocol.client_request import ClientRequest
 from common.protocol.message_codes import CLIENT_REGISTRATION_CODE, CLIENT_REGISTRATION_SUCCESS_CODE, \
-    CLIENT_REGISTRATION_FAIL_CODE, SERVER_REGISTRATION_CODE, SERVER_REGISTRATION_SUCCESS_CODE, GENERAL_SERVER_ERROR_CODE
+    CLIENT_REGISTRATION_FAIL_CODE, SERVER_REGISTRATION_CODE, SERVER_REGISTRATION_SUCCESS_CODE, \
+    GENERAL_SERVER_ERROR_CODE, SERVER_LIST_REQUEST_CODE, MESSAGE_SERVER_LIST_RESPONSE_CODE
 from common.protocol.request_1024_user_registration import UserRegistrationRequest
 from common.protocol.request_1025_server_registration import ServerRegistrationRequest
 from common.protocol.response_1600_user_registration_success import UserRegistrationSuccessResponse
@@ -61,7 +62,7 @@ class AuthServer:
             if len(chunk) < 1024:
                 break
 
-        print(f"Received data from {client_address}: {received_data}")
+        print(f"Received a request from {client_address}")
 
         try:
             response = self.process_request(received_data, client_socket)
@@ -115,6 +116,8 @@ class AuthServer:
         elif request_code == SERVER_REGISTRATION_CODE:
             client_ip, client_port = client_socket.getpeername()
             return self.process_server_registration(request, client_ip, client_port)
+        elif request_code == SERVER_LIST_REQUEST_CODE:
+            return self.process_server_list_request(request)
         else:
             return "unknown request"
 
@@ -159,7 +162,6 @@ class AuthServer:
                 if message_server.name == server_registration_payload.name:
                     raise RuntimeError("Message server name already exists!")
 
-
             server_id = uuid.uuid4()
             server_name = server_registration_payload.name
             server_key = server_registration_payload.message_server_key
@@ -175,8 +177,22 @@ class AuthServer:
             response = ServerResponse(VERSION, GENERAL_SERVER_ERROR_CODE, None)
 
         return response.pack()
+
     def add_message_server_to_file(self, server: MessageServer):
         self.message_servers[server.get_id_string()] = server
         server_line = f'{server.server_id.hex()}:{server.name}:{server.key.hex()}:{server.ip_address}:{server.port}'
         write_line_to_file(SERVERS, server_line)
+
+    def process_server_list_request(self, request):
+        try:
+            server_list = ''
+            i = 1
+            for message_server in self.message_servers.values():
+                server_list += f'{i}) {message_server.name} ID: {message_server.server_id.hex()} at: {message_server.ip_address}:{message_server.port}\n'
+                i = i + 1
+            response = ServerResponse(VERSION, MESSAGE_SERVER_LIST_RESPONSE_CODE, server_list.encode('utf-8'))
+        except RuntimeError as e:
+            response = ServerResponse(VERSION, GENERAL_SERVER_ERROR_CODE, None)
+
+        return response.pack()
 # TODO return response object

@@ -20,10 +20,15 @@ class ClientRequest:
         # default value. Will be calculated from actual payload size when packing
         # It is not needed in my implementation, and only exists to support the protocol definition
         self.payload_size = 0
+        if payload is None:
+            payload = bytes(0)
         self.payload = payload
 
     def pack(self):
-        payload_data = self.payload.pack()
+        if not isinstance(self.payload, bytes):
+            payload_data = self.payload.pack()  # convert to bytes if it is not already
+        else:
+            payload_data = self.payload
         format_string = '<16sBHI' + str(len(payload_data)) + 's'
         self.payload_size = len(payload_data)
         return struct.pack(format_string, self.client_id, self.version, self.code, self.payload_size,
@@ -40,5 +45,8 @@ class ClientRequest:
         """
         client_id, version, code, payload_size = struct.unpack('<16sBHI', packed_data[:23])
         payload_data = packed_data[23:23 + payload_size]
-        payload = payload_type.unpack(payload_data)  # TODO make this dynamic
+        if payload_size > 0:
+            payload = payload_type.unpack(payload_data)
+        else:
+            payload = bytes(0)
         return cls(client_id, version, code, payload)
