@@ -76,8 +76,8 @@ class MessageServer:
 
             response = ServerResponse.unpack(response_bytes, MessageServerRegistrationSuccessResponse)
             if response.code == SERVER_REGISTRATION_SUCCESS_CODE:
-                print(f"Server registered - ID: {response.payload.server_id.hex()}")
-                self.message_server_id = response.payload.server_id
+                print(f"Server registered - ID: {response.payload.message_server_id.hex()}")
+                self.message_server_id = response.payload.message_server_id
                 self.auth_server_key = auth_server_key
                 write_lines_to_file(self.config_file, [self.auth_server_key.hex(), self.message_server_id.hex()])
             else:

@@ -1,15 +1,19 @@
 import socket
+from typing import cast
 
 from auth_server.auth_server import CLIENT_REGISTRATION_SUCCESS_CODE
-from common.cryptography_utils import sha256_hash, generate_random_long
+from common.cryptography_utils import sha256_hash, generate_nonce_bytes, decrypt_aes_cbc
 from common.file_utils import is_file_exists, read_file_lines, write_lines_to_file
 from common.protocol.client_request import ClientRequest
+from common.protocol.encrypted_session_key import EncryptedSessionKey
 from common.protocol.message_codes import CLIENT_REGISTRATION_CODE, SERVER_LIST_REQUEST_CODE, \
-    MESSAGE_SERVER_LIST_RESPONSE_CODE, SESSION_KEY_AND_TICKET_REQUEST_CODE
+    MESSAGE_SERVER_LIST_RESPONSE_CODE, SESSION_KEY_AND_TICKET_REQUEST_CODE, SESSION_KEY_AND_TICKET_SUCCESS_RESPONSE_CODE
 from common.protocol.request_1024_user_registration import UserRegistrationRequest
 from common.protocol.request_1027_session_key import SessionKeyAndTicketRequest
 from common.protocol.response_1600_user_registration_success import UserRegistrationSuccessResponse
+from common.protocol.response_1603_key_and_token_success_response import KeyAndTokenResponse
 from common.protocol.server_response import ServerResponse
+from common.protocol.ticket import Ticket
 from common.string_utils import extract_substring_between
 
 
@@ -19,7 +23,7 @@ class Client:
     def __init__(self):
         self.nonce = None
         self.client_id = None
-        self.passwordHash = None
+        self.password_hash = None
         self.name = None
         self.auth_server_ip = None
         self.auth_server_port = None
@@ -28,6 +32,8 @@ class Client:
         self.message_server_ip = None
         self.message_server_port = None
         self.session_key = None
+        self.ticket = None
+
         self.start_client()
 
     def initialize_without_config(self):
@@ -40,7 +46,7 @@ class Client:
         if password == 'exit':
             print('Exiting the client.')
             exit(0)
-        self.passwordHash = sha256_hash(password.encode('utf-8'))
+        self.password_hash = sha256_hash(password.encode('utf-8'))
         self.register_client(name, password)
 
     def initialize_with_me_info_file(self):
@@ -53,7 +59,7 @@ class Client:
         if password == 'exit':
             print('Exiting the client.')
             exit(0)
-        self.passwordHash = sha256_hash(password.encode('utf-8'))
+        self.password_hash = sha256_hash(password.encode('utf-8'))
 
     def start_client(self):
         self.set_auth_server()
@@ -177,23 +183,31 @@ class Client:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.connect((self.auth_server_ip, self.auth_server_port))
         try:
-            self.nonce = generate_random_long()
+            self.nonce = generate_nonce_bytes()
             payload = SessionKeyAndTicketRequest(self.message_server_id, self.nonce)
-            request = ClientRequest(bytearray(16), 24, SESSION_KEY_AND_TICKET_REQUEST_CODE, payload)
+            request = ClientRequest(self.client_id, 24, SESSION_KEY_AND_TICKET_REQUEST_CODE, payload)
             client_socket.send(request.pack())
             print(f'Session key and ticket request for communication with {self.message_server_name} sent!')
             response_bytes = client_socket.recv(1024)
 
 
-            response = ServerResponse.unpack(response_bytes, bytes)
-            if response.code == MESSAGE_SERVER_LIST_RESPONSE_CODE:
-                message_servers = response.payload.decode('utf-8')
-            else:
-                print(f'Error {response.code} - Could not fetch servers list!')
-        except RuntimeError as e:
+            response = ServerResponse.unpack(response_bytes, KeyAndTokenResponse)
+            if response.code != SESSION_KEY_AND_TICKET_SUCCESS_RESPONSE_CODE:
+                raise RuntimeError(f'Error {response.code} - Could not get session key!')
+
+            response_payload = cast(KeyAndTokenResponse, response.payload)
+            encrypted_key = EncryptedSessionKey.unpack(response_payload.session_key)
+            ticket = Ticket.unpack(response_payload.ticket)
+            iv = encrypted_key.iv
+            self.session_key = decrypt_aes_cbc(self.password_hash, encrypted_key.session_key, iv)
+            nonce = decrypt_aes_cbc(self.password_hash, encrypted_key.nonce, iv)
+            if self.nonce != nonce:
+                raise RuntimeError(f'Received nonce is incorrect')
+            self.ticket = ticket
+            print(f'Received a session key {self.session_key.hex()} and ticket from the auth server!')
+        except Exception as e:
             print(e)
         finally:
             # Close the socket
             print("Closing the connection from client side")
             client_socket.close()
-            return message_servers

@@ -1,4 +1,6 @@
 import secrets
+import traceback
+
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
 from Crypto.Util.Padding import pad, unpad
@@ -18,24 +20,27 @@ def encrypt_aes_cbc(key, plain_bytes, iv):
         iv = get_random_bytes(AES.block_size)
     cipher = AES.new(key, AES.MODE_CBC, iv)
     padded_data = pad(plain_bytes, AES.block_size)
-    ciphertext = cipher.encrypt(padded_data)
-    return ciphertext, iv
+    encrypted_bytes = cipher.encrypt(padded_data)
+    return encrypted_bytes, iv
 
 
-def decrypt_aes_cbc(key, ciphertext, iv):
+def decrypt_aes_cbc(key, encrypted_bytes, iv):
     """
     Decrypts an AES-CBC encoded text
     :param key: The key bytes
-    :param ciphertext: encrypted bytes
+    :param encrypted_bytes: encrypted bytes
     :param iv: iv bytes
     :return: decrypted bytes
     """
     try:
         cipher = AES.new(key, AES.MODE_CBC, iv)
-        decrypted_bytes = unpad(cipher.decrypt(ciphertext), AES.block_size)
-        return decrypted_bytes
-    except (ValueError, KeyError):
+        decrypted_bytes = cipher.decrypt(encrypted_bytes)
+        unpadded_bytes = unpad(decrypted_bytes, AES.block_size)
+        return unpadded_bytes
+    except (ValueError, KeyError) as e:
         print("Incorrect decryption")
+        traceback.print_exc()
+        print(e)
     return None
 
 
@@ -56,7 +61,7 @@ def generate_aes_key():
     return key
 
 
-def generate_random_long():
+def generate_nonce_bytes():
     byte_size = 8
     random_bytes = secrets.token_bytes(byte_size)
     return random_bytes

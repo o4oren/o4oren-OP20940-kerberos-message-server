@@ -14,8 +14,16 @@ def get_datetime_from_str(date_string, date_format='%Y-%m-%d %H:%M:%S'):
 
 
 def get_datetime_from_ts(ts_string):
-    return datetime.fromtimestamp(int(ts_string))
+    return datetime.utcfromtimestamp(int(ts_string))
 
+def get_datetime_from_ts_bytes(ts_bytes):
+    timestamp_integer = int.from_bytes(ts_bytes, byteorder='little')
+    return datetime.utcfromtimestamp(timestamp_integer)
+
+def datetime_to_timestamp_bytes(dt_object):
+    timestamp = int(dt_object.timestamp())
+    timestamp_bytes = timestamp.to_bytes(8, byteorder='big')
+    return timestamp_bytes
 
 def get_date_string(my_datetime: datetime):
     return my_datetime.strftime("%Y-%m-%d %H:%M:%S")

@@ -18,7 +18,7 @@ class MessageServer:
         """
 
         if len(message_server_id) == 16:
-            self.server_id = message_server_id
+            self.message_server_id = message_server_id
         else:
             raise ValueError("Illegal server id")
 
@@ -36,7 +36,7 @@ class MessageServer:
         self.port = port
 
     def get_id_string(self):
-        return self.server_id.hex()
+        return self.message_server_id.hex()
 
     @classmethod
     def from_line(cls, line: str):

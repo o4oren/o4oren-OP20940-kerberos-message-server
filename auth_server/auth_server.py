@@ -1,32 +1,36 @@
 import socket
 import struct
 import threading
+import traceback
 import uuid
+from datetime import datetime, timedelta
+from typing import cast
 
-from common.cryptography_utils import sha256_hash
-from common.date_utils import get_date_string, get_timestamp_string
+from common.cryptography_utils import sha256_hash, generate_aes_key, encrypt_aes_cbc
+from common.date_utils import get_date_string, get_timestamp_string, datetime_to_timestamp_bytes
 from common.network_utils import is_valid_port
 from common.file_utils import read_file_lines, write_line_to_file, write_lines_to_file, is_file_exists
 from common.protocol.client_request import ClientRequest
+from common.protocol.encrypted_session_key import EncryptedSessionKey
 from common.protocol.message_codes import CLIENT_REGISTRATION_CODE, CLIENT_REGISTRATION_SUCCESS_CODE, \
     CLIENT_REGISTRATION_FAIL_CODE, SERVER_REGISTRATION_CODE, SERVER_REGISTRATION_SUCCESS_CODE, \
     GENERAL_SERVER_ERROR_CODE, SERVER_LIST_REQUEST_CODE, MESSAGE_SERVER_LIST_RESPONSE_CODE, \
-    SESSION_KEY_AND_TICKET_REQUEST_CODE
+    SESSION_KEY_AND_TICKET_REQUEST_CODE, SESSION_KEY_AND_TICKET_SUCCESS_RESPONSE_CODE
 from common.protocol.request_1024_user_registration import UserRegistrationRequest
 from common.protocol.request_1025_server_registration import ServerRegistrationRequest
 from common.protocol.request_1027_session_key import SessionKeyAndTicketRequest
 from common.protocol.response_1600_user_registration_success import UserRegistrationSuccessResponse
+from common.protocol.response_1603_key_and_token_success_response import KeyAndTokenResponse
 from common.protocol.response_1608_message_server_registration_success import MessageServerRegistrationSuccessResponse
 from common.protocol.server_response import ServerResponse
+from common.protocol.ticket import Ticket
 from .client import Client
 from .message_server import MessageServer
 
 SERVERS = 'servers'
-
 CLIENTS = 'clients'
-
 VERSION = 24
-
+SESSION_KEY_LIFETIMEMINUTES = 5
 
 class AuthServer:
     def __init__(self, server_port_file):
@@ -72,7 +76,8 @@ class AuthServer:
             client_socket.send(response)
 
         except Exception as e:
-            print(f"error an with responded server {e}")
+            print(f"error  {e}")
+            traceback.print_exc()
 
         finally:
             print(f"Connection with {client_address} closed.")
@@ -97,7 +102,7 @@ class AuthServer:
             for line in lines:
                 server = MessageServer.from_line(line)
                 self.message_servers[server.get_id_string()] = server
-                print(f'Loaded {len(lines)} message servers from "servers" file')
+            print(f'Loaded {len(lines)} message servers from "servers" file')
 
         # Create a socket server
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -175,7 +180,7 @@ class AuthServer:
             message_server = MessageServer(server_id.bytes, server_name, server_key, server_ip, server_port)
             self.add_message_server_to_file(message_server)
 
-            message_server_registration_payload = MessageServerRegistrationSuccessResponse(message_server.server_id)
+            message_server_registration_payload = MessageServerRegistrationSuccessResponse(message_server.message_server_id)
             response = ServerResponse(VERSION, SERVER_REGISTRATION_SUCCESS_CODE, message_server_registration_payload)
         except RuntimeError as e:
             response = ServerResponse(VERSION, GENERAL_SERVER_ERROR_CODE, None)
@@ -184,7 +189,7 @@ class AuthServer:
 
     def add_message_server_to_file(self, server: MessageServer):
         self.message_servers[server.get_id_string()] = server
-        server_line = f'{server.server_id.hex()}:{server.name}:{server.key.hex()}:{server.ip_address}:{server.port}'
+        server_line = f'{server.message_server_id.hex()}:{server.name}:{server.key.hex()}:{server.ip_address}:{server.port}'
         write_line_to_file(SERVERS, server_line)
 
     def process_server_list_request(self, request):
@@ -192,7 +197,7 @@ class AuthServer:
             server_list = ''
             i = 1
             for message_server in self.message_servers.values():
-                server_list += f'{i}) {message_server.name} ID: {message_server.server_id.hex()} at: {message_server.ip_address}:{message_server.port}\n'
+                server_list += f'{i}) {message_server.name} ID: {message_server.message_server_id.hex()} at: {message_server.ip_address}:{message_server.port}\n'
                 i = i + 1
             response = ServerResponse(VERSION, MESSAGE_SERVER_LIST_RESPONSE_CODE, server_list.encode('utf-8'))
         except RuntimeError as e:
@@ -201,9 +206,35 @@ class AuthServer:
         return response.pack()
 
     def process_session_key_and_ticket_request(self, request):
-        server_request = ClientRequest.unpack(request, payload_type=SessionKeyAndTicketRequest)
-        session_key_and_ticket_request = server_request.payload
-        server = self.message_servers[session_key_and_ticket_request.message_server_id]
-        if server is None:
-            raise RuntimeError("Message server not found!")
+        response = None
+        try:
+            client_request = ClientRequest.unpack(request, payload_type=SessionKeyAndTicketRequest)
+            session_key_and_ticket_request = cast(SessionKeyAndTicketRequest, client_request.payload)
+            server = self.message_servers[session_key_and_ticket_request.message_server_id]
+            if server is None:
+                raise RuntimeError("Message server not found!")
 
+            # Create the encrypted key field
+            client = self.clients[client_request.client_id.hex()]
+            session_key = generate_aes_key()
+            print(f'Generated session key {session_key.hex()}')
+            encrypted_key, iv = encrypt_aes_cbc(client.password_hash, session_key, None)
+            encrypted_nonce, _ = encrypt_aes_cbc(client.password_hash, session_key_and_ticket_request.nonce, iv)
+
+            session_key_bytes = EncryptedSessionKey(iv, encrypted_nonce, encrypted_key).pack()
+
+            # create the ticket field
+            creation_time = datetime.now()
+            expiration_time = creation_time + timedelta(minutes=SESSION_KEY_LIFETIMEMINUTES)
+            ticket_encrypted_session_key, ticket_iv = encrypt_aes_cbc(server.key, session_key, None)
+            ticket_encrypted_expiration_time, _ = encrypt_aes_cbc(server.key, datetime_to_timestamp_bytes(expiration_time), ticket_iv)
+
+            ticket_bytes = Ticket(VERSION, client_request.client_id, server.message_server_id, datetime_to_timestamp_bytes(creation_time), ticket_iv, ticket_encrypted_session_key, ticket_encrypted_expiration_time).pack()
+
+            response_payload = KeyAndTokenResponse(client.client_id, session_key_bytes, ticket_bytes)
+            response = ServerResponse(VERSION, SESSION_KEY_AND_TICKET_SUCCESS_RESPONSE_CODE, response_payload)
+        except Exception as e:
+            print(e)
+            response = ServerResponse(VERSION, GENERAL_SERVER_ERROR_CODE, None)
+        finally:
+            return response.pack()
