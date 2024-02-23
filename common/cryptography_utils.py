@@ -32,15 +32,10 @@ def decrypt_aes_cbc(key, encrypted_bytes, iv):
     :param iv: iv bytes
     :return: decrypted bytes
     """
-    try:
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        decrypted_bytes = cipher.decrypt(encrypted_bytes)
-        unpadded_bytes = unpad(decrypted_bytes, AES.block_size)
-        return unpadded_bytes
-    except (ValueError, KeyError) as e:
-        print("Incorrect decryption")
-        traceback.print_exc()
-        print(e)
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    decrypted_bytes = unpad(cipher.decrypt(encrypted_bytes), AES.block_size)
+    return decrypted_bytes
+
     return None
 
 

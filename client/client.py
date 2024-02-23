@@ -73,7 +73,7 @@ class Client:
         self.get_key_and_ticket()
 
         while True:
-            print('Select and action:\n1) Send message to server\n2) Select another server\n3) Exit program\n')
+            print('\nSelect an action:\n1) Send message to server\n2) Select another server\n3) Exit program')
             actions = int(input())
 
             if actions == 1:
@@ -190,7 +190,6 @@ class Client:
             print(f'Session key and ticket request for communication with {self.message_server_name} sent!')
             response_bytes = client_socket.recv(1024)
 
-
             response = ServerResponse.unpack(response_bytes, KeyAndTokenResponse)
             if response.code != SESSION_KEY_AND_TICKET_SUCCESS_RESPONSE_CODE:
                 raise RuntimeError(f'Error {response.code} - Could not get session key!')
@@ -205,8 +204,8 @@ class Client:
                 raise RuntimeError(f'Received nonce is incorrect')
             self.ticket = ticket
             print(f'Received a session key {self.session_key.hex()} and ticket from the auth server!')
-        except Exception as e:
-            print(e)
+        except ValueError as e:
+            print(f'{type(e)} {e} - are you sure you typed the correct password?')
         finally:
             # Close the socket
             print("Closing the connection from client side")

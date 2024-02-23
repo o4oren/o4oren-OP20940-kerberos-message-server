@@ -78,6 +78,7 @@ class AuthServer:
         except Exception as e:
             print(f"error  {e}")
             traceback.print_exc()
+            client_socket.send(ServerResponse(VERSION, GENERAL_SERVER_ERROR_CODE, None))
 
         finally:
             print(f"Connection with {client_address} closed.")
@@ -86,7 +87,7 @@ class AuthServer:
     def start_server(self):
         """
         Initializes the clients list from clients file
-        Initializes message %s lisr from server.csv
+        Initializes message %s list from server.csv
         Starts listening on the port passed in initialization.
         """
         print(f'auth server started on port {self.port}!')
