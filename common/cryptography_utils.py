@@ -1,8 +1,8 @@
+import secrets
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
-import base64
 
 
 def encrypt_aes_cbc(key, plain_bytes, iv):
@@ -54,3 +54,9 @@ def sha256_hash(input_bytes: bytes):
 def generate_aes_key():
     key = get_random_bytes(32)
     return key
+
+
+def generate_random_long():
+    byte_size = 8
+    random_bytes = secrets.token_bytes(byte_size)
+    return random_bytes

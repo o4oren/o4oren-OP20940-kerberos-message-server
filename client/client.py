@@ -1,12 +1,13 @@
 import socket
 
 from auth_server.auth_server import CLIENT_REGISTRATION_SUCCESS_CODE
-from common.cryptography_utils import sha256_hash
+from common.cryptography_utils import sha256_hash, generate_random_long
 from common.file_utils import is_file_exists, read_file_lines, write_lines_to_file
 from common.protocol.client_request import ClientRequest
 from common.protocol.message_codes import CLIENT_REGISTRATION_CODE, SERVER_LIST_REQUEST_CODE, \
-    MESSAGE_SERVER_LIST_RESPONSE_CODE
+    MESSAGE_SERVER_LIST_RESPONSE_CODE, SESSION_KEY_AND_TICKET_REQUEST_CODE
 from common.protocol.request_1024_user_registration import UserRegistrationRequest
+from common.protocol.request_1027_session_key import SessionKeyAndTicketRequest
 from common.protocol.response_1600_user_registration_success import UserRegistrationSuccessResponse
 from common.protocol.server_response import ServerResponse
 from common.string_utils import extract_substring_between
@@ -16,6 +17,7 @@ class Client:
     CONFIG_FILE = "me.info"
 
     def __init__(self):
+        self.nonce = None
         self.client_id = None
         self.passwordHash = None
         self.name = None
@@ -25,6 +27,7 @@ class Client:
         self.message_server_id = None
         self.message_server_ip = None
         self.message_server_port = None
+        self.session_key = None
         self.start_client()
 
     def initialize_without_config(self):
@@ -61,16 +64,19 @@ class Client:
             self.initialize_without_config()
 
         self.select_message_server()
+        self.get_key_and_ticket()
 
         while True:
-            print('Select and action:\n1) Send message to server\n2) Select another server\n3) Exit program')
+            print('Select and action:\n1) Send message to server\n2) Select another server\n3) Exit program\n')
             actions = int(input())
 
             if actions == 1:
-                print('sending message')
+                print('Enter your message:\n')
+                message = input()
+
             elif actions == 2:
                 self.select_message_server()
-
+                self.get_key_and_ticket()
             elif actions == 3:
                 print('Exiting the client.')
                 break
@@ -141,7 +147,7 @@ class Client:
     def select_message_server(self):
         message_servers = self.list_message_servers()
 
-        if len(message_servers) is 0:
+        if len(message_servers) == 0:
             print('There are no registered message servers!')
             exit(1)
         else:
@@ -166,3 +172,28 @@ class Client:
         self.message_server_ip = server[2]
         self.message_server_port = server[3]
         print(f'Selected {self.message_server_name}')
+
+    def get_key_and_ticket(self):
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((self.auth_server_ip, self.auth_server_port))
+        try:
+            self.nonce = generate_random_long()
+            payload = SessionKeyAndTicketRequest(self.message_server_id, self.nonce)
+            request = ClientRequest(bytearray(16), 24, SESSION_KEY_AND_TICKET_REQUEST_CODE, payload)
+            client_socket.send(request.pack())
+            print(f'Session key and ticket request for communication with {self.message_server_name} sent!')
+            response_bytes = client_socket.recv(1024)
+
+
+            response = ServerResponse.unpack(response_bytes, bytes)
+            if response.code == MESSAGE_SERVER_LIST_RESPONSE_CODE:
+                message_servers = response.payload.decode('utf-8')
+            else:
+                print(f'Error {response.code} - Could not fetch servers list!')
+        except RuntimeError as e:
+            print(e)
+        finally:
+            # Close the socket
+            print("Closing the connection from client side")
+            client_socket.close()
+            return message_servers

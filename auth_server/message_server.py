@@ -35,7 +35,6 @@ class MessageServer:
         self.ip_address = ip_address
         self.port = port
 
-
     def get_id_string(self):
         return self.server_id.hex()
 

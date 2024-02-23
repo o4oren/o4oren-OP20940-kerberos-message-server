@@ -10,9 +10,11 @@ from common.file_utils import read_file_lines, write_line_to_file, write_lines_t
 from common.protocol.client_request import ClientRequest
 from common.protocol.message_codes import CLIENT_REGISTRATION_CODE, CLIENT_REGISTRATION_SUCCESS_CODE, \
     CLIENT_REGISTRATION_FAIL_CODE, SERVER_REGISTRATION_CODE, SERVER_REGISTRATION_SUCCESS_CODE, \
-    GENERAL_SERVER_ERROR_CODE, SERVER_LIST_REQUEST_CODE, MESSAGE_SERVER_LIST_RESPONSE_CODE
+    GENERAL_SERVER_ERROR_CODE, SERVER_LIST_REQUEST_CODE, MESSAGE_SERVER_LIST_RESPONSE_CODE, \
+    SESSION_KEY_AND_TICKET_REQUEST_CODE
 from common.protocol.request_1024_user_registration import UserRegistrationRequest
 from common.protocol.request_1025_server_registration import ServerRegistrationRequest
+from common.protocol.request_1027_session_key import SessionKeyAndTicketRequest
 from common.protocol.response_1600_user_registration_success import UserRegistrationSuccessResponse
 from common.protocol.response_1608_message_server_registration_success import MessageServerRegistrationSuccessResponse
 from common.protocol.server_response import ServerResponse
@@ -118,6 +120,8 @@ class AuthServer:
             return self.process_server_registration(request, client_ip, client_port)
         elif request_code == SERVER_LIST_REQUEST_CODE:
             return self.process_server_list_request(request)
+        elif request_code == SESSION_KEY_AND_TICKET_REQUEST_CODE:
+            return self.process_session_key_and_ticket_request(request)
         else:
             return "unknown request"
 
@@ -195,4 +199,11 @@ class AuthServer:
             response = ServerResponse(VERSION, GENERAL_SERVER_ERROR_CODE, None)
 
         return response.pack()
-# TODO return response object
+
+    def process_session_key_and_ticket_request(self, request):
+        server_request = ClientRequest.unpack(request, payload_type=SessionKeyAndTicketRequest)
+        session_key_and_ticket_request = server_request.payload
+        server = self.message_servers[session_key_and_ticket_request.message_server_id]
+        if server is None:
+            raise RuntimeError("Message server not found!")
+
