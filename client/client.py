@@ -2,7 +2,7 @@ import socket
 
 from auth_server.auth_server import CLIENT_REGISTRATION_SUCCESS_CODE
 from common.cryptography_utils import sha256_hash
-from common.file_utils import is_file_exists, read_file_lines, write_line_to_file, write_lines_to_file
+from common.file_utils import is_file_exists, read_file_lines, write_lines_to_file
 from common.protocol.client_request import ClientRequest
 from common.protocol.message_codes import CLIENT_REGISTRATION_CODE, SERVER_LIST_REQUEST_CODE, \
     MESSAGE_SERVER_LIST_RESPONSE_CODE
@@ -32,7 +32,7 @@ class Client:
         if name == 'exit':
             print('Exiting the client.')
             exit(0)
-        self.name = name;
+        self.name = name
         password = input("Please enter a password (or 'exit' to quit): ")
         if password == 'exit':
             print('Exiting the client.')
@@ -60,21 +60,18 @@ class Client:
         else:
             self.initialize_without_config()
 
-        message_servers = self.list_message_servers()
-
-        if len(message_servers) is 0:
-            print('There are no registered message servers!')
-            exit(1)
-        else:
-            print('Message servers:\n')
-            print(message_servers)
-
-        self.select_message_server(message_servers)
+        self.select_message_server()
 
         while True:
-            message = input("Enter a message (or 'exit' to quit): ")
+            print('Select and action:\n1) Send message to server\n2) Select another server\n3) Exit program')
+            actions = int(input())
 
-            if message.lower() == 'exit':
+            if actions == 1:
+                print('sending message')
+            elif actions == 2:
+                self.select_message_server()
+
+            elif actions == 3:
                 print('Exiting the client.')
                 break
 
@@ -141,7 +138,16 @@ class Client:
             client_socket.close()
             return message_servers
 
-    def select_message_server(self, message_servers: str):
+    def select_message_server(self):
+        message_servers = self.list_message_servers()
+
+        if len(message_servers) is 0:
+            print('There are no registered message servers!')
+            exit(1)
+        else:
+            print('Message servers:\n')
+            print(message_servers)
+
         lines = message_servers.split('\n')
         servers = []
         for line in lines:
@@ -150,7 +156,7 @@ class Client:
             name = extract_substring_between(line, ') ', ' ID:')
             server_id = extract_substring_between(line, 'ID: ', " at:")
             ip_address = extract_substring_between(line, ' at: ', ':')
-            port = int((line[line.rfind(':')+1:len(line)]))
+            port = int((line[line.rfind(':') + 1:len(line)]))
             servers.append((name, server_id, ip_address, port))
 
         server_index = int(input("Please select a server from the list: "))
