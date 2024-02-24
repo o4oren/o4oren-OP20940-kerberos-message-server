@@ -211,7 +211,7 @@ class AuthServer:
         try:
             client_request = ClientRequest.unpack(request, payload_type=SessionKeyAndTicketRequest)
             session_key_and_ticket_request = cast(SessionKeyAndTicketRequest, client_request.payload)
-            server = self.message_servers[session_key_and_ticket_request.message_server_id]
+            server = self.message_servers[session_key_and_ticket_request.message_server_id.hex()]
             if server is None:
                 raise RuntimeError("Message server not found!")
 

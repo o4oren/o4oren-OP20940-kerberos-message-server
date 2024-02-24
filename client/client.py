@@ -225,7 +225,7 @@ class Client:
 
     def send_ticket_to_message_server(self):
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((self.auth_server_ip, self.auth_server_port))
+        client_socket.connect((self.message_server_ip, self.message_server_port))
         try:
             encrypted_version, iv = encrypt_aes_cbc(self.session_key, self.VERSION.to_bytes(), None)
             encrypted_client_id, _ = encrypt_aes_cbc(self.session_key, self.client_id, iv)

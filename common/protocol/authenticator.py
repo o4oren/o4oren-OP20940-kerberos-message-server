@@ -18,6 +18,6 @@ class Authenticator:
 
     @classmethod
     def unpack(cls, packed_data):
-        unpacked_data = struct.unpack('<<16s2s32s32s16s', packed_data)
+        unpacked_data = struct.unpack('<16s16s32s32s16s', packed_data)
         iv, encrypted_version, encrypted_client_id, encrypted_server_id, encrypted_creation_time = unpacked_data
         return cls(iv, encrypted_version, encrypted_client_id, encrypted_server_id, encrypted_creation_time)
