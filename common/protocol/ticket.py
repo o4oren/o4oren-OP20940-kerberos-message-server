@@ -16,8 +16,6 @@ class Ticket:
 
     def pack(self):
         format_string = '<B16s16s8s16s48s16s'
-        struct.pack(format_string, self.version, self.client_id, self.server_id, self.creation_time, self.iv, self.encrypted_session_key, self.encrypted_expiration_time)
-
         return struct.pack(format_string, self.version, self.client_id, self.server_id, self.creation_time, self.iv, self.encrypted_session_key, self.encrypted_expiration_time)
 
     @classmethod

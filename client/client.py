@@ -1,15 +1,21 @@
 import socket
+from datetime import datetime
 from typing import cast
 
 from auth_server.auth_server import CLIENT_REGISTRATION_SUCCESS_CODE
-from common.cryptography_utils import sha256_hash, generate_nonce_bytes, decrypt_aes_cbc
+from common.cryptography_utils import sha256_hash, generate_nonce_bytes, decrypt_aes_cbc, encrypt_aes_cbc
+from common.date_utils import datetime_to_timestamp_bytes
 from common.file_utils import is_file_exists, read_file_lines, write_lines_to_file
+from common.protocol.authenticator import Authenticator
 from common.protocol.client_request import ClientRequest
 from common.protocol.encrypted_session_key import EncryptedSessionKey
 from common.protocol.message_codes import CLIENT_REGISTRATION_CODE, SERVER_LIST_REQUEST_CODE, \
-    MESSAGE_SERVER_LIST_RESPONSE_CODE, SESSION_KEY_AND_TICKET_REQUEST_CODE, SESSION_KEY_AND_TICKET_SUCCESS_RESPONSE_CODE
+    MESSAGE_SERVER_LIST_RESPONSE_CODE, SESSION_KEY_AND_TICKET_REQUEST_CODE, \
+    SESSION_KEY_AND_TICKET_SUCCESS_RESPONSE_CODE, SEND_SESSION_KEY_TO_SERVER_REQUEST_CODE, \
+    SESSION_KEY_ACCEPTED_RESPONSE_CODE
 from common.protocol.request_1024_user_registration import UserRegistrationRequest
 from common.protocol.request_1027_session_key import SessionKeyAndTicketRequest
+from common.protocol.request_1028_send_session_key import SendSessionKeyRequest
 from common.protocol.response_1600_user_registration_success import UserRegistrationSuccessResponse
 from common.protocol.response_1603_key_and_token_success_response import KeyAndTokenResponse
 from common.protocol.server_response import ServerResponse
@@ -19,6 +25,7 @@ from common.string_utils import extract_substring_between
 
 class Client:
     CONFIG_FILE = "me.info"
+    VERSION = 24
 
     def __init__(self):
         self.nonce = None
@@ -32,7 +39,7 @@ class Client:
         self.message_server_ip = None
         self.message_server_port = None
         self.session_key = None
-        self.ticket = None
+        self.packed_ticket = None
 
         self.start_client()
 
@@ -71,6 +78,7 @@ class Client:
 
         self.select_message_server()
         self.get_key_and_ticket()
+        self.send_ticket_to_message_server()
 
         while True:
             print('\nSelect an action:\n1) Send message to server\n2) Select another server\n3) Exit program')
@@ -83,6 +91,7 @@ class Client:
             elif actions == 2:
                 self.select_message_server()
                 self.get_key_and_ticket()
+                self.send_ticket_to_message_server()
             elif actions == 3:
                 print('Exiting the client.')
                 break
@@ -174,7 +183,7 @@ class Client:
         server_index = int(input("Please select a server from the list: "))
         server = servers[server_index - 1]
         self.message_server_name = server[0]
-        self.message_server_id = server[1]
+        self.message_server_id = bytes.fromhex(server[1])
         self.message_server_ip = server[2]
         self.message_server_port = server[3]
         print(f'Selected {self.message_server_name}')
@@ -196,16 +205,48 @@ class Client:
 
             response_payload = cast(KeyAndTokenResponse, response.payload)
             encrypted_key = EncryptedSessionKey.unpack(response_payload.session_key)
-            ticket = Ticket.unpack(response_payload.ticket)
+            packed_ticket = response_payload.ticket
             iv = encrypted_key.iv
             self.session_key = decrypt_aes_cbc(self.password_hash, encrypted_key.session_key, iv)
             nonce = decrypt_aes_cbc(self.password_hash, encrypted_key.nonce, iv)
             if self.nonce != nonce:
                 raise RuntimeError(f'Received nonce is incorrect')
-            self.ticket = ticket
+            else:
+                print(f'Nonce verified!')
+
+            self.packed_ticket = packed_ticket
             print(f'Received a session key {self.session_key.hex()} and ticket from the auth server!')
         except ValueError as e:
             print(f'{type(e)} {e} - are you sure you typed the correct password?')
+        finally:
+            # Close the socket
+            print("Closing the connection from client side")
+            client_socket.close()
+
+    def send_ticket_to_message_server(self):
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((self.auth_server_ip, self.auth_server_port))
+        try:
+            encrypted_version, iv = encrypt_aes_cbc(self.session_key, self.VERSION.to_bytes(), None)
+            encrypted_client_id, _ = encrypt_aes_cbc(self.session_key, self.client_id, iv)
+            encrypted_server_id, _ = encrypt_aes_cbc(self.session_key, self.message_server_id, iv)
+            now = datetime.now()
+            creation_time_bytes = datetime_to_timestamp_bytes(now)
+            encrypted_creation_time, _ = encrypt_aes_cbc(self.session_key, creation_time_bytes, iv)
+            authenticator_bytes = Authenticator(iv, encrypted_version, encrypted_client_id, encrypted_server_id,
+                                                encrypted_creation_time).pack()
+            print(f'Authenticator created at {now}.')
+            payload = SendSessionKeyRequest(authenticator_bytes, self.packed_ticket)
+            request = ClientRequest(self.client_id, self.VERSION, SEND_SESSION_KEY_TO_SERVER_REQUEST_CODE, payload)
+            client_socket.send(request.pack())
+            print(
+                f'Sent ticket to message server {self.message_server_name} at {self.message_server_ip}:{self.message_server_port}!')
+            response_bytes = client_socket.recv(1024)
+            response = ServerResponse.unpack(response_bytes, bytes)
+            if response.code == SESSION_KEY_ACCEPTED_RESPONSE_CODE:
+                print(f'{self.message_server_name} responded with a success message')
+            else:
+                raise RuntimeError(f'{self.message_server_name} did not respond with a success message!')
         finally:
             # Close the socket
             print("Closing the connection from client side")

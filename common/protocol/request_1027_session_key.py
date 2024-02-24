@@ -8,10 +8,10 @@ class SessionKeyAndTicketRequest:
 
     def pack(self):
         format_string = '<16s8s'
-        return struct.pack(format_string, bytes.fromhex(self.message_server_id), self.nonce)
+        return struct.pack(format_string, self.message_server_id, self.nonce)
 
     @classmethod
     def unpack(cls, packed_data):
         unpacked_data = struct.unpack('<16s8s', packed_data)
         message_server_id, nonce = unpacked_data
-        return cls(message_server_id.hex(), nonce)
+        return cls(message_server_id, nonce)
