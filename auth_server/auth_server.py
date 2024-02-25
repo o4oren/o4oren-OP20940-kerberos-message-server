@@ -226,11 +226,12 @@ class AuthServer:
 
             # create the ticket field
             creation_time = datetime.now()
-            expiration_time = creation_time + timedelta(minutes=SESSION_KEY_LIFETIMEMINUTES)
+            creation_time_bytes = datetime_to_timestamp_bytes(creation_time)
+            expiration_time = creation_time + timedelta(minutes=5)
+            expiration_time_bytes = datetime_to_timestamp_bytes(expiration_time)
             ticket_encrypted_session_key, ticket_iv = encrypt_aes_cbc(server.key, session_key, None)
-            ticket_encrypted_expiration_time, _ = encrypt_aes_cbc(server.key, datetime_to_timestamp_bytes(expiration_time), ticket_iv)
-
-            ticket_bytes = Ticket(VERSION, client_request.client_id, server.message_server_id, datetime_to_timestamp_bytes(creation_time), ticket_iv, ticket_encrypted_session_key, ticket_encrypted_expiration_time).pack()
+            ticket_encrypted_expiration_time, _ = encrypt_aes_cbc(server.key, expiration_time_bytes, ticket_iv)
+            ticket_bytes = Ticket(VERSION, client_request.client_id, server.message_server_id, creation_time_bytes, ticket_iv, ticket_encrypted_session_key, ticket_encrypted_expiration_time).pack()
 
             response_payload = KeyAndTokenResponse(client.client_id, session_key_bytes, ticket_bytes)
             response = ServerResponse(VERSION, SESSION_KEY_AND_TICKET_SUCCESS_RESPONSE_CODE, response_payload)

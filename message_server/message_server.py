@@ -2,7 +2,7 @@ import socket
 import struct
 import threading
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import cast
 
 from common.cryptography_utils import generate_aes_key, decrypt_aes_cbc
@@ -12,7 +12,7 @@ from common.network_utils import is_valid_port, is_valid_ip
 from common.protocol.authenticator import Authenticator
 from common.protocol.client_request import ClientRequest
 from common.protocol.message_codes import SERVER_REGISTRATION_CODE, SERVER_REGISTRATION_SUCCESS_CODE, \
-    GENERAL_SERVER_ERROR_CODE, SEND_SESSION_KEY_TO_SERVER_REQUEST_CODE
+    GENERAL_SERVER_ERROR_CODE, SEND_SESSION_KEY_TO_SERVER_REQUEST_CODE, SESSION_KEY_ACCEPTED_RESPONSE_CODE
 from common.protocol.request_1025_server_registration import ServerRegistrationRequest
 from common.protocol.request_1028_send_session_key import SendSessionKeyRequest
 from common.protocol.response_1608_message_server_registration_success import MessageServerRegistrationSuccessResponse
@@ -46,6 +46,7 @@ class MessageServer:
         self.my_name = my_name
         self.auth_server_ip = auth_server_ip
         self.auth_server_port = auth_server_port
+        self.sessions = dict()
         if len(lines) == 5:
             self.auth_server_key = bytes.fromhex(lines[3])
             self.message_server_id = bytes.fromhex(lines[4])
@@ -131,7 +132,7 @@ class MessageServer:
         try:
             response = self.process_request(received_data, client_socket)
             # Send a response back to the client
-            client_socket.send(response)
+            client_socket.send(response.pack())
 
         except Exception as e:
             print(f"error  {e}")
@@ -166,9 +167,36 @@ class MessageServer:
         ticket = Ticket.unpack(client_payload.ticket)
         if ticket.server_id != self.message_server_id:
             raise ValueError("The ticket is not for this message server!")
-        if get_datetime_from_ts_bytes(ticket.creation_time) > datetime.now().date():
+        now_time = datetime.now()
+        ticket_time = get_datetime_from_ts_bytes(ticket.creation_time)
+        if ticket_time > now_time:
             raise ValueError("Ticket creation time is in the future!")
 
         ticket_expiration_timestamp = decrypt_aes_cbc(self.auth_server_key, ticket.encrypted_expiration_time, ticket.iv)
-        ticket_expiration_time = get_datetime_from_ts(ticket_expiration_timestamp)
-        print(ticket_expiration_time)
+        ticket_expiration_time = get_datetime_from_ts_bytes(ticket_expiration_timestamp)
+
+        session_key = decrypt_aes_cbc(self.auth_server_key, ticket.encrypted_session_key, ticket.iv)
+
+        # validate authenticator
+        authenticator_server_id = decrypt_aes_cbc(session_key, authenticator.encrypted_server_id, authenticator.iv)
+        authenticator_client_id = decrypt_aes_cbc(session_key, authenticator.encrypted_client_id, authenticator.iv)
+        authenticator_creation_time = get_datetime_from_ts_bytes(
+            decrypt_aes_cbc(session_key, authenticator.encrypted_creation_time, authenticator.iv))
+
+        if authenticator_creation_time > now_time - timedelta(minutes=10):
+            raise ValueError("Authenticator is older than 10 minutes!")
+        if authenticator_server_id != self.message_server_id or authenticator_client_id != client_request.client_id:
+            raise ValueError("Server or client IDs do not match!")
+
+        print("Authenticator decrypted with session key, and validated!")
+
+        self.sessions[ticket.client_id.hex()] = MessageServer.Session(session_key, ticket.iv, ticket_expiration_time)
+
+        response = ServerResponse(self.VERSION, SESSION_KEY_ACCEPTED_RESPONSE_CODE, None)
+        return response
+
+    class Session:
+        def __init__(self, key, iv, expiration_time):
+            self.expiration_time = expiration_time
+            self.iv = iv
+            self.key = key

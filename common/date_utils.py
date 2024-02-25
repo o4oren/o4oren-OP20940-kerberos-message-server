@@ -1,3 +1,4 @@
+import struct
 from datetime import datetime
 
 
@@ -18,8 +19,8 @@ def get_datetime_from_ts(ts_string):
 
 
 def get_datetime_from_ts_bytes(ts_bytes):
-    timestamp_integer = int.from_bytes(ts_bytes, byteorder='little')
-    return datetime.utcfromtimestamp(timestamp_integer)
+    timestamp = struct.unpack('!Q', ts_bytes)[0]
+    return datetime.utcfromtimestamp(timestamp)
 
 
 def datetime_to_timestamp_bytes(dt_object):

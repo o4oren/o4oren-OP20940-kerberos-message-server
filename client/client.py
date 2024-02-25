@@ -244,7 +244,7 @@ class Client:
             response_bytes = client_socket.recv(1024)
             response = ServerResponse.unpack(response_bytes, bytes)
             if response.code == SESSION_KEY_ACCEPTED_RESPONSE_CODE:
-                print(f'{self.message_server_name} responded with a success message')
+                print(f'{self.message_server_name} approved receiving the session key!')
             else:
                 raise RuntimeError(f'{self.message_server_name} did not respond with a success message!')
         finally:
