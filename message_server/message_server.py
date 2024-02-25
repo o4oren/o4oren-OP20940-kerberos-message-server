@@ -12,9 +12,11 @@ from common.network_utils import is_valid_port, is_valid_ip
 from common.protocol.authenticator import Authenticator
 from common.protocol.client_request import ClientRequest
 from common.protocol.message_codes import SERVER_REGISTRATION_CODE, SERVER_REGISTRATION_SUCCESS_CODE, \
-    GENERAL_SERVER_ERROR_CODE, SEND_SESSION_KEY_TO_SERVER_REQUEST_CODE, SESSION_KEY_ACCEPTED_RESPONSE_CODE
+    GENERAL_SERVER_ERROR_CODE, SEND_SESSION_KEY_TO_SERVER_REQUEST_CODE, SESSION_KEY_ACCEPTED_RESPONSE_CODE, \
+    SEND_MESSAGE_REQUEST_CODE, MESSAGE_ACCEPTED_RESPONSE_CODE
 from common.protocol.request_1025_server_registration import ServerRegistrationRequest
 from common.protocol.request_1028_send_session_key import SendSessionKeyRequest
+from common.protocol.request_1029_send_message import SendMessageRequest
 from common.protocol.response_1608_message_server_registration_success import MessageServerRegistrationSuccessResponse
 from common.protocol.server_response import ServerResponse
 from common.protocol.ticket import Ticket
@@ -137,7 +139,7 @@ class MessageServer:
         except Exception as e:
             print(f"error  {e}")
             traceback.print_exc()
-            client_socket.send(ServerResponse(self.VERSION, GENERAL_SERVER_ERROR_CODE, None))
+            client_socket.send(ServerResponse(self.VERSION, GENERAL_SERVER_ERROR_CODE, None).pack())
 
         finally:
             print(f"Connection with {client_address} closed.")
@@ -147,10 +149,11 @@ class MessageServer:
         request_code = self.get_request_code(request)
         if request_code == SEND_SESSION_KEY_TO_SERVER_REQUEST_CODE:
             return self.process_session_key_received(request)
-        elif request_code == SERVER_REGISTRATION_CODE:
-            pass
+        elif request_code == SEND_MESSAGE_REQUEST_CODE:
+            return self.process_message_send_request(request)
         else:
-            return "unknown request"
+            print("Unknown request!")
+            return ServerResponse(self.VERSION, GENERAL_SERVER_ERROR_CODE, None)
 
     def get_request_code(self, request):
         pass
@@ -163,11 +166,12 @@ class MessageServer:
     def process_session_key_received(self, request):
         client_request = ClientRequest.unpack(request, payload_type=SendSessionKeyRequest)
         client_payload = cast(SendSessionKeyRequest, client_request.payload)
+        print(f'Received ticket from {client_request.client_id.hex()}')
         authenticator = Authenticator.unpack(client_payload.authenticator)
         ticket = Ticket.unpack(client_payload.ticket)
         if ticket.server_id != self.message_server_id:
             raise ValueError("The ticket is not for this message server!")
-        now_time = datetime.now()
+        now_time = datetime.utcnow()
         ticket_time = get_datetime_from_ts_bytes(ticket.creation_time)
         if ticket_time > now_time:
             raise ValueError("Ticket creation time is in the future!")
@@ -188,15 +192,30 @@ class MessageServer:
         if authenticator_server_id != self.message_server_id or authenticator_client_id != client_request.client_id:
             raise ValueError("Server or client IDs do not match!")
 
-        print("Authenticator decrypted with session key, and validated!")
-
+        print("Authenticator decrypted with session key, and validated! Sending accept to client.")
         self.sessions[ticket.client_id.hex()] = MessageServer.Session(session_key, ticket.iv, ticket_expiration_time)
-
         response = ServerResponse(self.VERSION, SESSION_KEY_ACCEPTED_RESPONSE_CODE, None)
         return response
 
+    def process_message_send_request(self, request):
+        client_request = ClientRequest.unpack(request, payload_type=SendMessageRequest)
+        client_payload = cast(SendMessageRequest, client_request.payload)
+        session = self.sessions[client_request.client_id.hex()]
+        if session is None:
+            raise RuntimeError(f'Could not find client session with client id {client_request.client_id.hex()}')
+        now = datetime.utcnow()
+        if session.expiration_time < now:
+            raise RuntimeError(f'Session key expired! Please get a new ticket from the auth server!')
+
+        decrypted_message = decrypt_aes_cbc(session.key, client_payload.encrypted_message, client_payload.message_iv)
+
+        print(f"Message from P{client_request.client_id.hex()}:\n{decrypted_message.decode('utf-8')}")
+        response = ServerResponse(self.VERSION, MESSAGE_ACCEPTED_RESPONSE_CODE, None)
+        return response
+
     class Session:
-        def __init__(self, key, iv, expiration_time):
-            self.expiration_time = expiration_time
-            self.iv = iv
-            self.key = key
+            def __init__(self, key, iv, expiration_time):
+                self.expiration_time = expiration_time
+                self.iv = iv
+                self.key = key
+

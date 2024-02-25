@@ -12,10 +12,11 @@ from common.protocol.encrypted_session_key import EncryptedSessionKey
 from common.protocol.message_codes import CLIENT_REGISTRATION_CODE, SERVER_LIST_REQUEST_CODE, \
     MESSAGE_SERVER_LIST_RESPONSE_CODE, SESSION_KEY_AND_TICKET_REQUEST_CODE, \
     SESSION_KEY_AND_TICKET_SUCCESS_RESPONSE_CODE, SEND_SESSION_KEY_TO_SERVER_REQUEST_CODE, \
-    SESSION_KEY_ACCEPTED_RESPONSE_CODE
+    SESSION_KEY_ACCEPTED_RESPONSE_CODE, SEND_MESSAGE_REQUEST_CODE, MESSAGE_ACCEPTED_RESPONSE_CODE
 from common.protocol.request_1024_user_registration import UserRegistrationRequest
 from common.protocol.request_1027_session_key import SessionKeyAndTicketRequest
 from common.protocol.request_1028_send_session_key import SendSessionKeyRequest
+from common.protocol.request_1029_send_message import SendMessageRequest
 from common.protocol.response_1600_user_registration_success import UserRegistrationSuccessResponse
 from common.protocol.response_1603_key_and_token_success_response import KeyAndTokenResponse
 from common.protocol.server_response import ServerResponse
@@ -87,6 +88,7 @@ class Client:
             if actions == 1:
                 print('Enter your message:\n')
                 message = input()
+                self.send_message_to_server(message)
 
             elif actions == 2:
                 self.select_message_server()
@@ -230,7 +232,7 @@ class Client:
             encrypted_version, iv = encrypt_aes_cbc(self.session_key, self.VERSION.to_bytes(), None)
             encrypted_client_id, _ = encrypt_aes_cbc(self.session_key, self.client_id, iv)
             encrypted_server_id, _ = encrypt_aes_cbc(self.session_key, self.message_server_id, iv)
-            now = datetime.now()
+            now = datetime.utcnow()
             creation_time_bytes = datetime_to_timestamp_bytes(now)
             encrypted_creation_time, _ = encrypt_aes_cbc(self.session_key, creation_time_bytes, iv)
             authenticator_bytes = Authenticator(iv, encrypted_version, encrypted_client_id, encrypted_server_id,
@@ -247,6 +249,28 @@ class Client:
                 print(f'{self.message_server_name} approved receiving the session key!')
             else:
                 raise RuntimeError(f'{self.message_server_name} did not respond with a success message!')
+        finally:
+            # Close the socket
+            print("Closing the connection from client side")
+            client_socket.close()
+
+    def send_message_to_server(self, message):
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((self.message_server_ip, self.message_server_port))
+        try:
+            print(f'Sending message to {self.message_server_name}')
+            encrypted_message, message_iv = encrypt_aes_cbc(self.session_key, message.encode('utf-8'), None)
+            payload = SendMessageRequest(message_iv, encrypted_message)
+            request = ClientRequest(self.client_id, self.VERSION, SEND_MESSAGE_REQUEST_CODE, payload)
+            client_socket.send(request.pack())
+
+            response_bytes = client_socket.recv(1024)
+            response = ServerResponse.unpack(response_bytes, bytes)
+            if response.code == MESSAGE_ACCEPTED_RESPONSE_CODE:
+                print(f'{self.message_server_name} approved receiving, decrypting and printing the message!')
+            else:
+                raise RuntimeError(f'{self.message_server_name} did not respond with a success message!')
+
         finally:
             # Close the socket
             print("Closing the connection from client side")

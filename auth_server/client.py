@@ -32,7 +32,7 @@ class Client:
             raise ValueError("Illegal client password hash")
 
         if last_seen is None:
-            last_seen = datetime.now()
+            last_seen = datetime.utcnow()
         self.last_seen = last_seen
 
     def get_id_string(self):

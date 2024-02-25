@@ -225,7 +225,7 @@ class AuthServer:
             session_key_bytes = EncryptedSessionKey(iv, encrypted_nonce, encrypted_key).pack()
 
             # create the ticket field
-            creation_time = datetime.now()
+            creation_time = datetime.utcnow()
             creation_time_bytes = datetime_to_timestamp_bytes(creation_time)
             expiration_time = creation_time + timedelta(minutes=5)
             expiration_time_bytes = datetime_to_timestamp_bytes(expiration_time)
