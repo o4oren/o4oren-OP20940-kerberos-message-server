@@ -232,7 +232,7 @@ class Client:
             encrypted_version, iv = encrypt_aes_cbc(self.session_key, self.VERSION.to_bytes(), None)
             encrypted_client_id, _ = encrypt_aes_cbc(self.session_key, self.client_id, iv)
             encrypted_server_id, _ = encrypt_aes_cbc(self.session_key, self.message_server_id, iv)
-            now = datetime.utcnow()
+            now = datetime.now()
             creation_time_bytes = datetime_to_timestamp_bytes(now)
             encrypted_creation_time, _ = encrypt_aes_cbc(self.session_key, creation_time_bytes, iv)
             authenticator_bytes = Authenticator(iv, encrypted_version, encrypted_client_id, encrypted_server_id,

@@ -171,7 +171,7 @@ class MessageServer:
         ticket = Ticket.unpack(client_payload.ticket)
         if ticket.server_id != self.message_server_id:
             raise ValueError("The ticket is not for this message server!")
-        now_time = datetime.utcnow()
+        now_time = datetime.now()
         ticket_time = get_datetime_from_ts_bytes(ticket.creation_time)
         if ticket_time > now_time:
             raise ValueError("Ticket creation time is in the future!")
@@ -187,7 +187,7 @@ class MessageServer:
         authenticator_creation_time = get_datetime_from_ts_bytes(
             decrypt_aes_cbc(session_key, authenticator.encrypted_creation_time, authenticator.iv))
 
-        if authenticator_creation_time > now_time - timedelta(minutes=10):
+        if authenticator_creation_time < now_time - timedelta(minutes=10):
             raise ValueError("Authenticator is older than 10 minutes!")
         if authenticator_server_id != self.message_server_id or authenticator_client_id != client_request.client_id:
             raise ValueError("Server or client IDs do not match!")
@@ -203,7 +203,7 @@ class MessageServer:
         session = self.sessions[client_request.client_id.hex()]
         if session is None:
             raise RuntimeError(f'Could not find client session with client id {client_request.client_id.hex()}')
-        now = datetime.utcnow()
+        now = datetime.now()
         if session.expiration_time < now:
             raise RuntimeError(f'Session key expired! Please get a new ticket from the auth server!')
 
